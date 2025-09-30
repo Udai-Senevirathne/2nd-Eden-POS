@@ -1,0 +1,17 @@
+{
+  "name": "2nd Eden POS System",
+  "short_name": "Eden POS",
+  "description": "Restaurant Point of Sale System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
