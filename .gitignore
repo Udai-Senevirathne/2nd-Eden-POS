@@ -7,10 +7,80 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+dist-electron/
 *.local
+
+# Electron build artifacts
+*.exe
+*.blockmap
+*.yml
+*.yaml
+*.bin
+*.pak
+*.dll
+*.dat
+*.json.backup
+*.snap
+*.swp
+*.tmp
+dist-electron/win-unpacked/
+dist-electron/**/*.exe
+dist-electron/**/*.dll
+dist-electron/**/*.pak
+dist-electron/**/*.bin
+dist-electron/**/*.dat
+dist-electron/**/*.yml
+dist-electron/**/*.yaml
+dist-electron/**/*.blockmap
+dist-electron/**/*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# Editor directories and files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files
+.env
+.env.*
+
+# Misc
+*.bak
+*.old
+*.orig
+*.rej
+*.tmp
+*.temp
+
+# Public assets (ignore built, not source)
+public/*.bak
+public/*.tmp
 
 # Editor directories and files
 .vscode/*
