@@ -20,7 +20,7 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    price: '',
+    price: '', // always in LKR since menu items are stored in LKR
     category: 'food' as 'food' | 'beverage',
     subcategory: '',
     description: '',
@@ -42,19 +42,17 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.name || !formData.price || !formData.subcategory) {
       alert('Please fill in all required fields');
       return;
     }
-
     try {
       setIsLoading(true);
+      // Store price in LKR directly (no conversion needed since menu items are in LKR)
       const itemData = {
         ...formData,
         price: parseFloat(formData.price),
       };
-
       if (editingId) {
         await onUpdateItem(editingId, itemData);
         setEditingId(null);
@@ -62,7 +60,6 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
         await onAddItem(itemData);
         setIsAddingNew(false);
       }
-      
       resetForm();
     } catch (err) {
       console.error('Error saving menu item:', err);
@@ -73,6 +70,7 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
   };
 
   const handleEdit = (item: MenuItem) => {
+    // Show price in LKR as stored (no conversion needed)
     setFormData({
       name: item.name,
       price: item.price.toString(),
@@ -122,7 +120,7 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
     if (category === 'food') {
       return ['Starters', 'Breakfast', 'Main', 'Desserts'];
     }
-    return ['Coffee', 'Smoothies', 'Soft Drinks', 'Fresh Juices'];
+    return ['Coffee', 'Tea & Non-Coffee', 'Cold Beverage', 'Fresh Juice', 'Smoothies', 'Milkshakes', 'Soft Drinks'];
   };
 
   return (
@@ -167,7 +165,7 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price *
+                  Price (LKR) *
                 </label>
                 <input
                   type="number"
@@ -175,7 +173,7 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
+                  placeholder="Enter price in LKR (e.g., 500)"
                   required
                 />
               </div>
@@ -318,7 +316,7 @@ export const MenuManagement: React.FC<MenuManagementProps> = ({
                 <div className="flex-1">
                   <h4 className="font-semibold text-gray-900">{item.name}</h4>
                   <p className="text-sm text-gray-600 capitalize">{item.category} • {item.subcategory}</p>
-                  <p className="text-lg font-bold text-gray-900">${item.price.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-gray-900">Rs {item.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 </div>
                 {item.image && (
                   <img

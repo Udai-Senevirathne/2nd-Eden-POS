@@ -1,13 +1,4 @@
 # Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Logs
 logs/
 *.log
 npm-debug.log*
@@ -81,15 +72,3 @@ Desktop.ini
 # Public assets (ignore built, not source)
 public/*.bak
 public/*.tmp
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.env

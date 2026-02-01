@@ -85,7 +85,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <div className="mb-6">
             <div className="text-center bg-gray-50 rounded-lg p-4">
               <p className="text-gray-600 mb-1">Total Amount</p>
-              <p className="text-3xl font-bold text-gray-900">{formatPrice(convertPrice(totalAmount, 'USD'))}</p>
+              <p className="text-3xl font-bold text-gray-900">{formatPrice(convertPrice(totalAmount, 'LKR'))}</p>
             </div>
           </div>
 

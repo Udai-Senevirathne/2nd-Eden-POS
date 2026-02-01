@@ -85,7 +85,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onAddToCart, c
         
         <div className="flex justify-between items-center">
           <span className="text-xl font-bold text-gray-900">
-            {formatPrice(convertPrice(item.price, 'USD'))}
+            {formatPrice(convertPrice(item.price, 'LKR'))}
           </span>
           
           <button

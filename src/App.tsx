@@ -13,6 +13,7 @@ import { QuickRefundModal } from './components/QuickRefundModal';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useCart } from './hooks/useCart';
 import { usePopup } from './hooks/usePopup';
+import { useServiceChargeSettings, calculateTotal } from './hooks/useServiceChargeSettings';
 import { Popup } from './components/Popup';
 import { Loading } from './components/Loading';
 import { menuItemsService, ordersService, subscribeToMenuItems, subscribeToOrders, settingsService } from './services/database';
@@ -135,6 +136,12 @@ function PosSystem() {
   
   // Initialize popup functionality
   const { popup, showError, showSuccess, closePopup } = usePopup();
+
+  // Get service charge settings for total calculation
+  const { serviceCharge } = useServiceChargeSettings();
+  
+  // Ensure we have a valid service charge (fallback to 8.5% if loading/invalid)
+  const effectiveServiceCharge = serviceCharge && serviceCharge > 0 ? serviceCharge : 8.5;
 
   // Test popup functionality
   const testPopupSystem = useCallback(() => {
@@ -315,9 +322,12 @@ function PosSystem() {
       'main': ['main', 'main course', 'mains', 'entrees', 'entree'],
       'desserts': ['desserts', 'dessert', 'sweets', 'sweet'],
       'coffee': ['coffee', 'hot drinks', 'hot drink', 'espresso'],
-      'smoothies': ['smoothies', 'smoothie', 'shakes', 'shake'],
-      'soft drinks': ['soft drinks', 'soft drink', 'soda', 'cold drinks', 'cold drink'],
-      'fresh juices': ['fresh juices', 'fresh juice', 'juice', 'juices']
+      'tea & non-coffee': ['tea & non-coffee', 'tea', 'hot chocolate', 'milo'],
+      'cold beverage': ['cold beverage', 'iced drinks', 'iced'],
+      'fresh juice': ['fresh juice', 'juice', 'juices'],
+      'smoothies': ['smoothies', 'smoothie'],
+      'milkshakes': ['milkshakes', 'milkshake', 'shakes', 'shake'],
+      'soft drinks': ['soft drinks', 'soft drink', 'soda', 'cold drinks', 'cold drink']
     };
     
     // Normalize both subcategories for comparison
@@ -327,6 +337,20 @@ function PosSystem() {
     // Check if item subcategory matches selected subcategory or its aliases
     const matchesSubcategory = subcategoryMap[selectedSubcategoryLower]?.includes(itemSubcategory) || 
                               itemSubcategory === selectedSubcategoryLower;
+    
+    // Debug logging
+    if (selectedCategory === 'beverage' && selectedSubcategory === 'Coffee') {
+      console.log('🔍 Filtering Coffee items:', {
+        itemName: item.name,
+        itemSubcategory: item.subcategory,
+        itemSubcategoryLower: itemSubcategory,
+        selectedSubcategory: selectedSubcategory,
+        selectedSubcategoryLower: selectedSubcategoryLower,
+        matchesSubcategory: matchesSubcategory,
+        itemCategory: item.category,
+        available: item.available
+      });
+    }
     
     return item.category === selectedCategory && 
            matchesSubcategory &&
@@ -350,13 +374,23 @@ function PosSystem() {
   const handlePaymentComplete = async (paymentMethod: 'cash' | 'card', tableNumber: string) => {
     try {
       const orderNumber = Math.random().toString(36).substring(2, 8).toUpperCase();
-      console.log('🛒 Creating order:', { orderNumber, items: cartItems.length, total: getTotalPrice(), paymentMethod, tableNumber });
+      const subtotal = getTotalPrice();
+      const totalWithServiceCharge = calculateTotal(subtotal, effectiveServiceCharge);
+      console.log('🛒 Creating order:', { 
+        orderNumber, 
+        items: cartItems.length, 
+        subtotal, 
+        serviceCharge: effectiveServiceCharge,
+        total: totalWithServiceCharge, 
+        paymentMethod, 
+        tableNumber 
+      });
       
       // Save order to database
       const order = await ordersService.create({
         orderNumber,
         items: cartItems,
-        total: getTotalPrice(),
+        total: totalWithServiceCharge,
         paymentMethod,
         tableNumber
       });
@@ -395,7 +429,7 @@ function PosSystem() {
       setIsConfirmationOpen(true);
       clearCart();
       
-      // Enhanced receipt printing
+      // Enhanced receipt printing with better error handling
       try {
         await ReceiptPrinter.printReceipt(order, {
           copies: 1,
@@ -404,7 +438,20 @@ function PosSystem() {
         console.log('✅ Receipt printed successfully');
       } catch (printError) {
         console.error('❌ Receipt printing failed:', printError);
-        showError('Order completed but receipt printing failed. You can reprint from order confirmation.');
+        
+        // Determine the specific error and provide helpful feedback
+        const errorMessage = printError instanceof Error ? printError.message : 'Unknown printing error';
+        
+        if (errorMessage.includes('popup') || errorMessage.includes('blocked')) {
+          showError('Receipt printing blocked by browser. Check your popup blocker settings and try again, or use the order confirmation to reprint.');
+        } else if (errorMessage.includes('print settings')) {
+          showError('Printer issue detected. Please check your printer connection and try again from order confirmation.');
+        } else {
+          showError('Order completed successfully, but receipt printing failed. You can reprint from the order confirmation screen.');
+        }
+        
+        // Store failed print attempt for retry
+        console.log('📄 Storing order for print retry:', order.id);
       }
     } catch (err) {
       console.error('❌ Error completing payment:', err);
@@ -639,7 +686,7 @@ function PosSystem() {
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
         onPaymentComplete={handlePaymentComplete}
-        totalAmount={getTotalPrice()}
+        totalAmount={calculateTotal(getTotalPrice(), effectiveServiceCharge)}
         currency={selectedCurrency}
       />
 
@@ -666,6 +713,7 @@ function PosSystem() {
           onUpdateMenuItem={handleUpdateMenuItem}
           onDeleteMenuItem={handleDeleteMenuItem}
           onSaveSettings={handleSaveSettings}
+          currency={selectedCurrency}
         />
       </ProtectedRoute>
 

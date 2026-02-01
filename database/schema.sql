@@ -130,7 +130,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO settings (key, value) VALUES
 ('restaurant', '{"name": "2nd Eden Restaurant", "address": "123 Main St", "phone": "(555) 123-4567", "currency": "USD"}'),
 ('receipt', '{"headerText": "2nd Eden Restaurant", "footerText": "Thank you for your visit!", "paperSize": "thermal-80mm", "autoPrint": true, "showLogo": false}'),
-('system', '{"taxRate": 0.08, "serviceCharge": 0.10, "allowDiscounts": true, "maxRefundAmount": 1000}')
+('system', '{"serviceChargeRate": 8.5, "allowDiscounts": true, "maxRefundAmount": 1000}')
 ON CONFLICT DO NOTHING;
 
 -- Create triggers to update the updated_at timestamp

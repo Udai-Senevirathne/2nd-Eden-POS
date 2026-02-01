@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Order } from '../types';
 import { useCurrency } from '../utils/currencyUtils';
+import { useServiceChargeSettings, calculateServiceCharge } from '../hooks/useServiceChargeSettings';
 import { settingsService } from '../services/database';
 import { Loading } from './Loading';
 
@@ -31,6 +32,10 @@ export const Receipt: React.FC<ReceiptProps> = ({
   className = '' 
 }) => {
   const { formatPrice, convertPrice } = useCurrency(currency);
+  const { serviceCharge } = useServiceChargeSettings();
+  
+  // Ensure we have a valid service charge (fallback to 8.5% if loading/invalid)
+  const effectiveServiceCharge = serviceCharge && serviceCharge > 0 ? serviceCharge : 8.5;
   const [isLoading, setIsLoading] = useState(true);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>({
     headerText: 'Thank you for dining with us!',
@@ -203,11 +208,11 @@ export const Receipt: React.FC<ReceiptProps> = ({
         <div className="space-y-1">
           <div className="flex justify-between">
             <span>Subtotal:</span>
-            <span>{formatPrice(convertPrice(order.total / 1.085, 'USD'))}</span>
+            <span>{formatPrice(convertPrice(order.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0), 'USD'))}</span>
           </div>
           <div className="flex justify-between text-xs">
-            <span>Tax (8.5%):</span>
-            <span>{formatPrice(convertPrice(order.total * 0.085 / 1.085, 'USD'))}</span>
+            <span>Service Charge ({effectiveServiceCharge}%):</span>
+            <span>{formatPrice(convertPrice(calculateServiceCharge(order.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0), effectiveServiceCharge), 'USD'))}</span>
           </div>
           <div className="flex justify-between font-bold text-base border-t border-dashed border-gray-400 pt-2">
             <span>TOTAL:</span>

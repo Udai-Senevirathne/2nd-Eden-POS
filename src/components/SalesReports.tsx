@@ -11,9 +11,11 @@ import {
   Star
 } from 'lucide-react';
 import { Order, MenuItem } from '../types';
+import { useCurrency } from '../utils/currencyUtils';
 
 interface SalesReportsProps {
   orders: Order[];
+  currency?: 'USD' | 'LKR';
 }
 
 type ReportPeriod = 'today' | 'week' | 'month' | 'year' | 'custom';
@@ -28,7 +30,8 @@ interface SalesMetrics {
   hourlyDistribution: { hour: number; orders: number; revenue: number }[];
 }
 
-export const SalesReports: React.FC<SalesReportsProps> = ({ orders }) => {
+export const SalesReports: React.FC<SalesReportsProps> = ({ orders, currency = 'USD' }) => {
+  const { formatPrice, convertPrice } = useCurrency(currency);
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -227,10 +230,9 @@ export const SalesReports: React.FC<SalesReportsProps> = ({ orders }) => {
   }, [filteredOrders]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    // Convert from USD (stored) to selected currency and format
+    const convertedAmount = convertPrice(amount, 'USD');
+    return formatPrice(convertedAmount);
   };
 
   const formatDate = (dateString: string) => {

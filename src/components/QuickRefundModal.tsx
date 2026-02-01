@@ -19,8 +19,19 @@ const REFUND_REASONS = [
   'Customer changed mind',
   'Long wait time',
   'Item not available',
+  'Food served cold',
+  'Allergic reaction',
   'Billing error',
+  'Staff error',
   'Other'
+];
+
+const QUICK_REFUND_PRESETS = [
+  { name: 'Quality Issue', percentage: 100, reason: 'Order quality issue' },
+  { name: 'Wrong Order', percentage: 100, reason: 'Wrong order received' },
+  { name: 'Cold Food', percentage: 50, reason: 'Food served cold' },
+  { name: 'Long Wait', percentage: 25, reason: 'Long wait time' },
+  { name: 'Staff Error', percentage: 100, reason: 'Staff error' }
 ];
 
 export const QuickRefundModal: React.FC<QuickRefundModalProps> = ({
@@ -431,6 +442,36 @@ if physical printer is not working.`;
                     <div className="text-sm text-gray-500">Replace with new order</div>
                   </button>
                 </div>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Quick Actions
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  {QUICK_REFUND_PRESETS.map((preset, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        if (preset.percentage === 100) {
+                          setRefundType('full');
+                        } else {
+                          setRefundType('partial');
+                          setRefundAmount(Math.round(selectedOrder.total * preset.percentage / 100 * 100) / 100);
+                        }
+                        setRefundReason(preset.reason);
+                      }}
+                      className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-colors"
+                    >
+                      <div className="font-medium">{preset.name}</div>
+                      <div className="text-xs text-gray-500">{preset.percentage}%</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Click any preset to quickly set refund type, amount, and reason
+                </p>
               </div>
 
               {/* Refund Amount */}

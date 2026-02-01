@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Save, Building, DollarSign, Printer, Users, Palette, Settings as SettingsIcon, Bell, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { settingsService } from '../services/database';
 import { usePopup } from '../hooks/usePopup';
@@ -13,10 +13,9 @@ interface RestaurantSettings {
     open: string;
     close: string;
   };
-  taxRate: number;
   serviceCharge: number;
   currency: string;
-  autoTax: boolean;
+  autoServiceCharge: boolean;
 }
 
 interface ReceiptSettings {
@@ -83,10 +82,9 @@ export const SettingsComponent: React.FC<SettingsComponentProps> = ({ onSaveSett
       open: '09:00',
       close: '22:00'
     },
-    taxRate: 8.5,
-    serviceCharge: 0,
+    serviceCharge: 8.5,
     currency: 'USD',
-    autoTax: true
+    autoServiceCharge: true
   });
 
   // Receipt Settings
@@ -133,6 +131,35 @@ export const SettingsComponent: React.FC<SettingsComponentProps> = ({ onSaveSett
   const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [savingUsers, setSavingUsers] = useState(false);
+
+  // Auto-save timeout for debouncing
+  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isSavingServiceCharge, setIsSavingServiceCharge] = useState(false);
+
+  // Debounced auto-save function
+  const autoSaveServiceCharge = useCallback(async (settings: RestaurantSettings) => {
+    // Clear previous timeout
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+
+    setIsSavingServiceCharge(true);
+
+    // Set new timeout for auto-save
+    const newTimeout = setTimeout(async () => {
+      try {
+        console.log('🔄 Auto-saving service charge:', settings.serviceCharge);
+        await settingsService.set('restaurant', settings);
+        console.log('✅ Service charge auto-saved successfully');
+      } catch (error) {
+        console.warn('⚠️ Auto-save failed:', error);
+      } finally {
+        setIsSavingServiceCharge(false);
+      }
+    }, 800); // 800ms delay
+
+    setSaveTimeout(newTimeout);
+  }, [saveTimeout]);
 
   // Load settings from database on component mount
   useEffect(() => {
@@ -241,6 +268,15 @@ export const SettingsComponent: React.FC<SettingsComponentProps> = ({ onSaveSett
 
     loadSettings();
   }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+    };
+  }, [saveTimeout]);
 
   const tabs = [
     { id: 'restaurant', name: 'Restaurant Info', icon: Building },
@@ -916,22 +952,10 @@ export const SettingsComponent: React.FC<SettingsComponentProps> = ({ onSaveSett
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tax Rate (%)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            value={restaurantSettings.taxRate}
-            onChange={(e) => setRestaurantSettings(prev => ({ ...prev, taxRate: parseFloat(e.target.value) || 0 }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
             Service Charge (%)
+            {isSavingServiceCharge && (
+              <span className="text-xs text-blue-500 ml-2">(saving...)</span>
+            )}
           </label>
           <input
             type="number"
@@ -939,24 +963,45 @@ export const SettingsComponent: React.FC<SettingsComponentProps> = ({ onSaveSett
             min="0"
             max="100"
             value={restaurantSettings.serviceCharge}
-            onChange={(e) => setRestaurantSettings(prev => ({ ...prev, serviceCharge: parseFloat(e.target.value) || 0 }))}
+            onChange={(e) => {
+              const newServiceCharge = parseFloat(e.target.value) || 0;
+              const updatedSettings = { ...restaurantSettings, serviceCharge: newServiceCharge };
+              
+              // Update local state immediately for instant UI feedback
+              setRestaurantSettings(updatedSettings);
+              
+              // Auto-save with debounce
+              autoSaveServiceCharge(updatedSettings);
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter service charge percentage (e.g., 8.5)"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Changes are automatically saved and applied to all orders in real-time
+          </p>
+          {restaurantSettings.serviceCharge > 0 && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+              <strong>Preview:</strong> Rs 1000 order → Service Charge: Rs {(1000 * restaurantSettings.serviceCharge / 100).toFixed(2)} → Total: Rs {(1000 + (1000 * restaurantSettings.serviceCharge / 100)).toFixed(2)}
+            </div>
+          )}
         </div>
         
         <div className="md:col-span-2">
           <div className="flex items-center">
             <input
               type="checkbox"
-              id="autoTax"
-              checked={restaurantSettings.autoTax}
-              onChange={(e) => setRestaurantSettings(prev => ({ ...prev, autoTax: e.target.checked }))}
+              id="autoServiceCharge"
+              checked={restaurantSettings.autoServiceCharge}
+              onChange={(e) => setRestaurantSettings(prev => ({ ...prev, autoServiceCharge: e.target.checked }))}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
-            <label htmlFor="autoTax" className="ml-2 block text-sm text-gray-900">
-              Automatically apply tax to all items
+            <label htmlFor="autoServiceCharge" className="ml-2 block text-sm text-gray-900">
+              Service charge is enabled for all orders
             </label>
           </div>
+          <p className="text-xs text-gray-500 mt-1 ml-6">
+            Service charge will be automatically added to all orders based on the percentage above
+          </p>
         </div>
       </div>
       
@@ -964,10 +1009,15 @@ export const SettingsComponent: React.FC<SettingsComponentProps> = ({ onSaveSett
         <button
           onClick={async () => {
             try {
+              console.log('💾 Saving restaurant settings:', restaurantSettings);
+              console.log('📊 Service charge being saved:', restaurantSettings.serviceCharge);
+              console.log('🔧 Auto service charge being saved:', restaurantSettings.autoServiceCharge);
+              
               await settingsService.set('restaurant', restaurantSettings);
+              console.log('✅ Restaurant settings saved successfully');
               showSuccess('Financial settings saved successfully!');
             } catch (error) {
-              console.error('Error saving financial settings:', error);
+              console.error('❌ Error saving financial settings:', error);
               showError('Error saving financial settings');
             }
           }}

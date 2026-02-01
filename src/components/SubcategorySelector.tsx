@@ -20,9 +20,12 @@ export const SubcategorySelector: React.FC<SubcategorySelectorProps> = ({
 
   const beverageSubcategories = [
     { id: 'Coffee', name: 'Coffee' },
+    { id: 'Tea & Non-Coffee', name: 'Tea & Non-Coffee' },
+    { id: 'Cold Beverage', name: 'Cold Beverage' },
+    { id: 'Fresh Juice', name: 'Fresh Juice' },
     { id: 'Smoothies', name: 'Smoothies' },
+    { id: 'Milkshakes', name: 'Milkshakes' },
     { id: 'Soft Drinks', name: 'Soft Drinks' },
-    { id: 'Fresh Juices', name: 'Fresh Juices' },
   ];
 
   const subcategories = category === 'food' ? foodSubcategories : beverageSubcategories;

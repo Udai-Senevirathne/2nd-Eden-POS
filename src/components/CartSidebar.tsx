@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { CartItem } from '../types';
 import { useCurrency } from '../utils/currencyUtils';
+import { useServiceChargeSettings, calculateServiceCharge, calculateTotal } from '../hooks/useServiceChargeSettings';
 
 interface CartSidebarProps {
   cartItems: CartItem[];
@@ -21,6 +22,18 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   currency = 'USD',
 }) => {
   const { formatPrice, convertPrice } = useCurrency(currency);
+  const { serviceCharge, loading } = useServiceChargeSettings();
+  
+  // Ensure we have a valid service charge (fallback to 8.5% if loading/invalid)
+  const effectiveServiceCharge = serviceCharge && serviceCharge > 0 ? serviceCharge : 8.5;
+  
+  console.log('🛒 CartSidebar - Service charge from hook:', serviceCharge);
+  console.log('🛒 CartSidebar - Effective service charge:', effectiveServiceCharge);
+  console.log('🛒 CartSidebar - Loading state:', loading);
+  
+  // Calculate service charge and total (always apply service charge)
+  const serviceChargeAmount = calculateServiceCharge(totalPrice, effectiveServiceCharge);
+  const finalTotal = calculateTotal(totalPrice, effectiveServiceCharge);
   return (
     <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
       {/* Cart Header */}
@@ -47,7 +60,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900 text-sm">{item.menuItem.name}</h4>
-                    <p className="text-gray-600 text-sm">{formatPrice(convertPrice(item.menuItem.price, 'USD'))} each</p>
+                    <p className="text-gray-600 text-sm">{formatPrice(convertPrice(item.menuItem.price, 'LKR'))} each</p>
                   </div>
                   <button
                     onClick={() => onRemoveItem(item.menuItem.id)}
@@ -73,7 +86,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  <span className="font-bold text-gray-900">{formatPrice(convertPrice(item.subtotal, 'USD'))}</span>
+                  <span className="font-bold text-gray-900">{formatPrice(convertPrice(item.subtotal, 'LKR'))}</span>
                 </div>
               </div>
             ))}
@@ -87,17 +100,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-700">Subtotal:</span>
-              <span className="text-lg font-semibold text-gray-900">{formatPrice(convertPrice(totalPrice, 'USD'))}</span>
+              <span className="text-lg font-semibold text-gray-900">{formatPrice(convertPrice(totalPrice, 'LKR'))}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold text-gray-700">Tax (8.5%):</span>
-              <span className="text-lg font-semibold text-gray-900">{formatPrice(convertPrice(totalPrice * 0.085, 'USD'))}</span>
+              <span className="text-lg font-semibold text-gray-700">
+                Service Charge ({effectiveServiceCharge.toFixed(1)}%)
+                {loading && <span className="text-xs text-blue-500 ml-1">(updating...)</span>}:
+              </span>
+              <span className="text-lg font-semibold text-gray-900">{formatPrice(convertPrice(serviceChargeAmount, 'LKR'))}</span>
             </div>
             <div className="border-t border-gray-300 pt-4">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-xl font-bold text-gray-900">Total:</span>
                 <span className="text-2xl font-bold text-gray-900">
-                  {formatPrice(convertPrice(totalPrice * 1.085, 'USD'))}
+                  {formatPrice(convertPrice(finalTotal, 'LKR'))}
                 </span>
               </div>
               <button

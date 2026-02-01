@@ -41,8 +41,8 @@ export const Header: React.FC<HeaderProps> = ({ onAdminClick, onRefundClick, cur
           
           {/* Currency Display */}
           <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-lg">
-            <span className="text-sm text-gray-600">Currency:</span>
-            <span className="font-bold text-gray-900">{currency} ({currencySymbol})</span>
+            <span className="text-sm font-medium text-gray-600">Currency:</span>
+            <span className="text-sm font-bold text-gray-900">{currency} ({currencySymbol})</span>
           </div>
         </div>
       </div>

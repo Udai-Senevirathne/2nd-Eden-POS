@@ -11,6 +11,7 @@ import { usePopup } from '../hooks/usePopup';
 import { useAuth } from '../hooks/useAuth';
 import { Popup } from './Popup';
 import ReceiptPrinter from '../services/receiptPrinter';
+import { useCurrency } from '../utils/currencyUtils';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface AdminPanelProps {
   onUpdateMenuItem: (id: string, item: Partial<MenuItem>) => Promise<void>;
   onDeleteMenuItem: (id: string) => Promise<void>;
   onSaveSettings: (settings: object) => void;
+  currency?: 'USD' | 'LKR';
 }
 
 type AdminTab = 'dashboard' | 'orders' | 'menu' | 'reports' | 'refunds' | 'settings';
@@ -34,7 +36,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onUpdateMenuItem,
   onDeleteMenuItem,
   onSaveSettings,
+  currency = 'USD',
 }) => {
+  const { formatPrice, convertPrice } = useCurrency(currency);
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [realTimeOrders, setRealTimeOrders] = useState<Order[]>(initialOrderHistory);
   const [realTimeMenuItems, setRealTimeMenuItems] = useState<MenuItem[]>(initialMenuItems);
@@ -226,7 +230,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     showConfirmPopup(
-      `Are you sure you want to permanently remove Order #${orderId}?\n\nOrder Total: $${orderTotal.toFixed(2)}\n\nThis action cannot be undone and will:\n• Remove the order from database\n• Remove from localStorage backup\n• Update all connected terminals`,
+      `Are you sure you want to permanently remove Order #${orderId}?\n\nOrder Total: ${formatPrice(convertPrice(orderTotal, 'USD'))}\n\nThis action cannot be undone and will:\n• Remove the order from database\n• Remove from localStorage backup\n• Update all connected terminals`,
       async () => {
         setIsLoading(true);
         try {
@@ -376,7 +380,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-600 text-sm font-medium">Today's Revenue</p>
-              <p className="text-2xl font-bold text-green-900">${getTodaysRevenue().toFixed(2)}</p>
+              <p className="text-2xl font-bold text-green-900">{formatPrice(convertPrice(getTodaysRevenue(), 'USD'))}</p>
             </div>
             <DollarSign className="w-8 h-8 text-green-500" />
           </div>
@@ -403,7 +407,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <p className="text-sm text-gray-600">{order.items.length} items • {order.timestamp.toLocaleTimeString()}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-900">${order.total.toFixed(2)}</p>
+                <p className="font-bold text-gray-900">{formatPrice(convertPrice(order.total, 'USD'))}</p>
                 <button
                   onClick={() => handleUpdateOrderStatus(order.id, 
                     order.status === 'pending' ? 'preparing' :
@@ -473,7 +477,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-gray-900">${order.total.toFixed(2)}</p>
+                <p className="text-xl font-bold text-gray-900">{formatPrice(convertPrice(order.total, 'USD'))}</p>
                 <div className="flex items-center justify-end space-x-2 mt-2">
                   <button
                     onClick={() => handleUpdateOrderStatus(order.id, 
@@ -513,7 +517,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {order.items.map((item: OrderItem, index: number) => (
                   <div key={index} className="flex justify-between items-center text-sm">
                     <span className="text-gray-700">{item.quantity}x {item.menuItem.name}</span>
-                    <span className="font-medium text-gray-900">${(item.quantity * item.menuItem.price).toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">{formatPrice(convertPrice(item.quantity * item.menuItem.price, 'USD'))}</span>
                   </div>
                 ))}
               </div>
@@ -571,6 +575,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           >
             <SalesReports
               orders={realTimeOrders}
+              currency={currency}
             />
           </PermissionGuard>
         );
@@ -584,6 +589,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <RefundManagement
               orders={realTimeOrders}
               onRefundOrder={handleRefundOrder}
+              currency={currency}
             />
           </PermissionGuard>
         );

@@ -1,8 +1,75 @@
 import { Order } from '../types';
 import { settingsService } from '../services/database';
+import { calculateServiceCharge } from '../hooks/useServiceChargeSettings';
+import BrowserUtils from '../utils/browserUtils';
 
 // Enhanced Receipt Printing System
 export class ReceiptPrinter {
+  private static async printUsingHiddenIframe(htmlContent: string, copies: number = 1) {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+
+        const cleanup = () => {
+          iframe.onload = null;
+          iframe.onerror = null;
+          iframe.parentNode?.removeChild(iframe);
+        };
+
+        iframe.onerror = (error) => {
+          cleanup();
+          reject(error instanceof Error ? error : new Error('Failed to load print iframe.'));
+        };
+
+        document.body.appendChild(iframe);
+
+        const iframeWindow = iframe.contentWindow;
+        const iframeDocument = iframeWindow?.document;
+
+        if (!iframeWindow || !iframeDocument) {
+          cleanup();
+          reject(new Error('Unable to access print iframe document.'));
+          return;
+        }
+
+        iframeDocument.open();
+        iframeDocument.write(htmlContent);
+        iframeDocument.close();
+
+        const printCopy = (index: number) => {
+          try {
+            iframeWindow.focus();
+            iframeWindow.print();
+          } catch (error) {
+            cleanup();
+            reject(error instanceof Error ? error : new Error('Printing failed.'));
+            return;
+          }
+
+          if (index + 1 < copies) {
+            setTimeout(() => printCopy(index + 1), 700);
+          } else {
+            setTimeout(() => {
+              cleanup();
+              resolve();
+            }, 400);
+          }
+        };
+
+        // Allow styles to apply before printing
+        setTimeout(() => printCopy(0), 150);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Unexpected error while preparing print iframe.'));
+      }
+    });
+  }
   
   // Get receipt settings from database
   static async getReceiptSettings() {
@@ -47,6 +114,14 @@ export class ReceiptPrinter {
   static async generateThermalReceipt(order: Order): Promise<string> {
     const settings = await this.getReceiptSettings();
     
+    // Get service charge settings
+    const restaurantSettings = await settingsService.get('restaurant') as { serviceCharge?: number };
+    const serviceChargeRate = restaurantSettings?.serviceCharge || 8.5;
+    
+    // Calculate subtotal and service charge properly
+    const subtotal = order.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0);
+    const serviceCharge = calculateServiceCharge(subtotal, serviceChargeRate);
+    
     return `
       <html>
         <head>
@@ -63,7 +138,7 @@ export class ReceiptPrinter {
                 width: 100%;
                 margin: 0;
                 padding: 0;
-                line-height: 1.1;
+                line-height: 1.2;
                 color: #000;
                 -webkit-print-color-adjust: exact;
               }
@@ -74,43 +149,41 @@ export class ReceiptPrinter {
               .large { font-size: 16px; }
               .medium { font-size: 14px; }
               .small { font-size: 10px; }
-              .line { 
-                border-bottom: 1px dashed #000; 
-                margin: 3px 0; 
+              .dotted-line { 
+                border-bottom: 1px dotted #000; 
+                margin: 5px 0; 
                 width: 100%;
                 box-sizing: border-box;
               }
-              .double-line { 
-                border-bottom: 2px solid #000; 
+              .solid-line { 
+                border-bottom: 1px solid #000; 
                 margin: 5px 0; 
                 width: 100%;
               }
               .item-row { 
                 display: flex; 
                 justify-content: space-between; 
-                margin: 1px 0;
+                margin: 2px 0;
                 width: 100%;
               }
               .item-name {
                 flex: 1;
                 text-align: left;
-                padding-right: 5px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                padding-right: 10px;
               }
               .item-qty {
                 width: 30px;
                 text-align: center;
               }
               .item-price {
-                width: 50px;
+                width: 80px;
                 text-align: right;
               }
               .no-print { display: none; }
               .receipt-content {
                 width: 100%;
                 box-sizing: border-box;
+                padding: 5px;
               }
             }
             @media screen {
@@ -129,97 +202,83 @@ export class ReceiptPrinter {
               .large { font-size: 18px; }
               .medium { font-size: 16px; }
               .small { font-size: 12px; }
-              .line { border-bottom: 1px dashed #000; margin: 8px 0; }
-              .double-line { border-bottom: 2px solid #000; margin: 10px 0; }
+              .dotted-line { border-bottom: 1px dotted #000; margin: 8px 0; }
+              .solid-line { border-bottom: 1px solid #000; margin: 8px 0; }
               .item-row { display: flex; justify-content: space-between; margin: 3px 0; }
               .item-name { flex: 1; text-align: left; padding-right: 10px; }
-              .item-qty { width: 40px; text-align: center; }
-              .item-price { width: 60px; text-align: right; }
+              .item-qty { width: 30px; text-align: center; }
+              .item-price { width: 80px; text-align: right; }
             }
           </style>
         </head>
         <body>
           <div class="receipt-content">
-            ${settings.showLogo ? `
-            <div class="center">
-              <!-- Logo placeholder - can be replaced with actual logo -->
-              <div class="bold large" style="margin-bottom: 5px;">🍽️</div>
-            </div>
-            ` : ''}
+            <div class="center bold large">2nd Eden Restaurant</div>
+            <div class="center small">123 Main Street, City, State 12345</div>
+            <div class="center small">Tel: +1 (555) 123-4567</div>
+            <div class="dotted-line"></div>
             
-            <div class="center bold large">${settings.businessName}</div>
-            <div class="center small">${settings.address}</div>
-            <div class="center small">Phone: ${settings.phone}</div>
-            <div class="line"></div>
+            <div class="center medium">Thank you for dining with us!</div>
+            <div class="dotted-line"></div>
             
             <div class="item-row">
               <span class="left"><strong>Order #:</strong></span>
               <span class="right">${order.id}</span>
             </div>
             <div class="item-row">
-              <span class="left"><strong>Date:</strong></span>
-              <span class="right">${order.timestamp.toLocaleDateString()}</span>
-            </div>
-            <div class="item-row">
-              <span class="left"><strong>Time:</strong></span>
-              <span class="right">${order.timestamp.toLocaleTimeString()}</span>
+              <span class="left"><strong>Date/Time:</strong></span>
+              <span class="right">${order.timestamp.toLocaleDateString()}, ${order.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
             <div class="item-row">
               <span class="left"><strong>Table:</strong></span>
-              <span class="right">${order.tableNumber || 'Takeaway'}</span>
+              <span class="right">${order.tableNumber || 'Table 10'}</span>
             </div>
             <div class="item-row">
               <span class="left"><strong>Payment:</strong></span>
               <span class="right">${order.paymentMethod?.toUpperCase() || 'CASH'}</span>
             </div>
             
-            <div class="double-line"></div>
+            <div class="dotted-line"></div>
             
-            <div class="bold center medium">ORDER DETAILS</div>
-            <div class="line"></div>
+            <div class="center bold">ITEMS:</div>
             
             ${order.items.map(item => `
-              <div class="item-row">
-                <span class="item-name">${item.menuItem.name}</span>
-                <span class="item-qty">x${item.quantity}</span>
-                <span class="item-price">$${(item.menuItem.price * item.quantity).toFixed(2)}</span>
-              </div>
-              ${item.notes ? `
-                <div class="small" style="margin-left: 5px; font-style: italic; color: #666;">
-                  Note: ${item.notes}
+              <div>
+                <div class="item-row">
+                  <span class="item-name">${item.menuItem.name}</span>
+                  <span class="item-qty">${item.quantity}x</span>
                 </div>
-              ` : ''}
+                <div class="item-row">
+                  <span class="left">@ Rs ${item.menuItem.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span class="right">Rs ${(item.menuItem.price * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
             `).join('')}
             
-            <div class="line"></div>
+            <div class="dotted-line"></div>
             
-            <div class="item-row bold medium">
+            <div class="item-row">
+              <span class="left">Subtotal:</span>
+              <span class="right">Rs ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div class="item-row">
+              <span class="left">Service Charge (${serviceChargeRate}%):</span>
+              <span class="right">Rs ${serviceCharge.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            
+            <div class="solid-line"></div>
+            
+            <div class="item-row bold large">
               <span>TOTAL:</span>
-              <span>$${order.total.toFixed(2)}</span>
+              <span>Rs ${order.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
             
-            <div class="double-line"></div>
+            <div class="solid-line"></div>
             
-            <div class="center">
-              <div class="bold">${settings.footerText}</div>
-              <div class="small" style="margin-top: 10px;">
-                Order processed on ${new Date().toLocaleString()}
-              </div>
-              <div class="small">
-                Served by: Staff
-              </div>
-            </div>
+            <div class="center medium">Please come again soon!</div>
             
-            <div class="center small" style="margin-top: 15px;">
-              <div>Visit us again soon!</div>
-              <div>⭐⭐⭐⭐⭐</div>
-            </div>
-            
-            <!-- QR Code placeholder for digital receipt/feedback -->
-            <div class="center" style="margin-top: 10px;">
-              <div class="small">Scan for digital receipt:</div>
-              <div style="font-size: 20px;">📱 QR</div>
-            </div>
+            <div class="center small" style="margin-top: 15px;">*** END OF RECEIPT ***</div>
+            <div class="center small">Powered by 2nd Eden POS</div>
           </div>
           
           <div class="no-print" style="text-align: center; margin-top: 20px;">
@@ -259,7 +318,7 @@ export class ReceiptPrinter {
     `;
   }
 
-  // Print receipt with enhanced functionality
+  // Print receipt with enhanced functionality and fallback options
   static async printReceipt(order: Order, options: {
     copies?: number;
     autoPrint?: boolean;
@@ -268,35 +327,72 @@ export class ReceiptPrinter {
     try {
       console.log('🖨️ Generating receipt for order:', order.id);
       
+      // Check browser compatibility first
+      const isPopupBlocked = await BrowserUtils.detectPopupBlocker();
+      console.log('🔍 Popup blocker status:', isPopupBlocked ? 'BLOCKED' : 'ALLOWED');
+      
       const receiptContent = await this.generateThermalReceipt(order);
       const settings = await this.getReceiptSettings();
       
-      const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+      // If popup is blocked, inform user and use fallback
+      if (isPopupBlocked) {
+        console.warn('⚠️ Popup blocker detected, using hidden iframe fallback');
+        const instructions = BrowserUtils.getPopupInstructions();
+        alert(`Receipt printing was blocked by your browser.\n\n${instructions}`);
+
+        await this.printUsingHiddenIframe(receiptContent, options.copies || 1);
+        return null;
+      }
       
-      if (!printWindow) {
-        throw new Error('Could not open print window. Please check popup blocker settings.');
+      // First attempt: try to open print window normally
+      let printWindow: Window | null = null;
+      
+      try {
+        printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+      } catch (popupError) {
+        console.warn('⚠️ Initial popup attempt failed:', popupError);
+      }
+      
+      // Check if popup was successful
+      if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
+        console.warn('⚠️ Popup failed despite detection, using hidden iframe fallback...');
+        await this.printUsingHiddenIframe(receiptContent, options.copies || 1);
+        return null;
       }
 
-      printWindow.document.write(receiptContent);
-      printWindow.document.close();
-      printWindow.focus();
-      
-      // Auto-print logic
-      const shouldAutoPrint = options.autoPrint !== false && settings.autoPrint;
-      const copies = options.copies || 1;
-      
-      if (shouldAutoPrint && !options.showPreview) {
-        setTimeout(() => {
-          for (let i = 0; i < copies; i++) {
+      // If we have a successful popup window
+      if (printWindow && !printWindow.closed) {
+        try {
+          printWindow.document.write(receiptContent);
+          printWindow.document.close();
+          printWindow.focus();
+          
+          // Auto-print logic
+          const shouldAutoPrint = options.autoPrint !== false && settings.autoPrint;
+          const copies = options.copies || 1;
+          
+          if (shouldAutoPrint && !options.showPreview) {
             setTimeout(() => {
-              printWindow.print();
-            }, i * 1000); // 1 second delay between copies
+              for (let i = 0; i < copies; i++) {
+                setTimeout(() => {
+                  try {
+                    printWindow!.print();
+                  } catch (printError) {
+                    console.warn(`⚠️ Print attempt ${i + 1} failed:`, printError);
+                  }
+                }, i * 1000); // 1 second delay between copies
+              }
+            }, 800);
           }
-        }, 800);
-      }
 
-      console.log('✅ Receipt generated successfully');
-      return printWindow;
+          console.log('✅ Receipt window opened successfully');
+          return printWindow;
+        } catch (contentError) {
+          console.error('❌ Error writing to print window:', contentError);
+          printWindow.close();
+          throw new Error('Failed to load receipt content. Please try again.');
+        }
+      }
       
     } catch (error) {
       console.error('❌ Receipt printing failed:', error);

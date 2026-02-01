@@ -23,10 +23,9 @@ INSERT INTO settings (key, value) VALUES
             "open": "09:00",
             "close": "22:00"
         },
-        "taxRate": 8.5,
-        "serviceCharge": 0,
+        "serviceCharge": 8.5,
         "currency": "USD",
-        "autoTax": true
+        "autoServiceCharge": true
     }'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
